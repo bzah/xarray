@@ -307,7 +307,7 @@ class VectorizedIndexer(ExplicitIndexer):
         for k in key:
             if isinstance(k, slice):
                 k = as_integer_slice(k)
-            elif isinstance(k, np.ndarray):
+            elif isinstance(k, np.ndarray) or isinstance(k, dask.array.Array):
                 if not np.issubdtype(k.dtype, np.integer):
                     raise TypeError(
                         f"invalid indexer array, does not have integer dtype: {k!r}"
@@ -320,7 +320,10 @@ class VectorizedIndexer(ExplicitIndexer):
                         "invalid indexer key: ndarray arguments "
                         f"have different numbers of dimensions: {ndims}"
                     )
-                k = np.asarray(k, dtype=np.int64)
+                if isinstance(k, dask.array.Array):
+                    k = dask.array.asarray(k, dtype=np.int64)
+                else:
+                    k = np.asarray(k, dtype=np.int64)
             else:
                 raise TypeError(
                     f"unexpected indexer type for {type(self).__name__}: {k!r}"
