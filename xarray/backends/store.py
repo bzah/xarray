@@ -28,7 +28,7 @@ class StoreBackendEntrypoint(BackendEntrypoint):
 
     def open_dataset(  # type: ignore[override]  # allow LSP violation, not supporting **kwargs
         self,
-        filename_or_obj: str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore,
+        filename_or_obj: AbstractDataStore,
         *,
         mask_and_scale=True,
         decode_times=True,

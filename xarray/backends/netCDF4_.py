@@ -409,9 +409,16 @@ class NetCDF4DataStore(WritableCFDataStore):
         return self._acquire()
 
     def open_store_variable(self, name, var):
+        import netCDF4
+
         dimensions = var.dimensions
         data = indexing.LazilyIndexedArray(NetCDF4ArrayWrapper(name, self))
         attributes = {k: var.getncattr(k) for k in var.ncattrs()}
+        enum_meaning = None
+        enum_name = None
+        if isinstance(var.datatype, netCDF4.EnumType):
+            enum_meaning = var.datatype.enum_dict
+            enum_name = var.datatype.name
         _ensure_fill_value_valid(data, attributes)
         # netCDF4 specific encoding; save _FillValue for later
         encoding = {}
@@ -434,8 +441,9 @@ class NetCDF4DataStore(WritableCFDataStore):
         encoding["source"] = self._filename
         encoding["original_shape"] = var.shape
         encoding["dtype"] = var.dtype
-
-        return Variable(dimensions, data, attributes, encoding)
+        return Variable(dimensions, data, attributes, encoding, 
+        enum_meaning= enum_meaning, 
+        enum_name=enum_name)
 
     def get_variables(self):
         return FrozenDict(
@@ -478,7 +486,7 @@ class NetCDF4DataStore(WritableCFDataStore):
         return variable
 
     def prepare_variable(
-        self, name, variable, check_encoding=False, unlimited_dims=None
+        self, name, variable: Variable, check_encoding=False, unlimited_dims=None
     ):
         _ensure_no_forward_slash_in_name(name)
 
@@ -503,12 +511,19 @@ class NetCDF4DataStore(WritableCFDataStore):
             variable, raise_on_invalid=check_encoding, unlimited_dims=unlimited_dims
         )
 
+        enum = None
+        if variable.enum_meaning:
+            enum = self.ds.createEnumType(
+                variable.dtype, 
+            variable.enum_name, 
+            variable.enum_meaning)
+
         if name in self.ds.variables:
             nc4_var = self.ds.variables[name]
         else:
             nc4_var = self.ds.createVariable(
                 varname=name,
-                datatype=datatype,
+                datatype=enum if enum else datatype,
                 dimensions=variable.dims,
                 zlib=encoding.get("zlib", False),
                 complevel=encoding.get("complevel", 4),

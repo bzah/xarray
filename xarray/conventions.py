@@ -48,10 +48,6 @@ if TYPE_CHECKING:
     T_DatasetOrAbstractstore = Union[Dataset, AbstractDataStore]
 
 
-def _var_as_tuple(var: Variable) -> T_VarTuple:
-    return var.dims, var.data, var.attrs.copy(), var.encoding.copy()
-
-
 def _infer_dtype(array, name: T_Name = None) -> np.dtype:
     """Given an object array with no missing values, infer its dtype from its
     first element
@@ -106,7 +102,7 @@ def _copy_with_dtype(data, dtype: np.typing.DTypeLike):
 def ensure_dtype_not_object(var: Variable, name: T_Name = None) -> Variable:
     # TODO: move this from conventions to backends? (it's not CF related)
     if var.dtype.kind == "O":
-        dims, data, attrs, encoding = _var_as_tuple(var)
+        dims, data, attrs, encoding, enum_meaning, enum_name = variables.unpack(var)
 
         # leave vlen dtypes unchanged
         if strings.check_vlen_dtype(data.dtype) is not None:
@@ -149,7 +145,7 @@ def ensure_dtype_not_object(var: Variable, name: T_Name = None) -> Variable:
             data = _copy_with_dtype(data, dtype=_infer_dtype(data, name))
 
         assert data.dtype.kind != "O" or data.dtype.metadata
-        var = Variable(dims, data, attrs, encoding, fastpath=True)
+        var = Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
     return var
 
 
@@ -286,14 +282,14 @@ def decode_cf_variable(
 
     var = variables.BooleanCoder().decode(var)
 
-    dimensions, data, attributes, encoding = variables.unpack_for_decoding(var)
+    dimensions, data, attributes, encoding, enum_meaning, enum_name = variables.unpack(var)
 
     encoding.setdefault("dtype", original_dtype)
 
     if not is_duck_dask_array(data):
         data = indexing.LazilyIndexedArray(data)
 
-    return Variable(dimensions, data, attributes, encoding=encoding, fastpath=True)
+    return Variable(dimensions, data, attributes, encoding=encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
 
 
 def _update_bounds_attributes(variables: T_Variables) -> None:
@@ -431,7 +427,7 @@ def decode_cf_variables(
             new_vars[k] = decode_cf_variable(
                 k,
                 v,
-                concat_characters=concat_characters,
+                concat_characters=False if v.enum_meaning else concat_characters,
                 mask_and_scale=mask_and_scale,
                 decode_times=decode_times,
                 stack_char_dim=stack_char_dim,
@@ -449,7 +445,6 @@ def decode_cf_variables(
                     new_vars[k].encoding["coordinates"] = coord_str
                     del var_attrs["coordinates"]
                     coord_names.update(var_coord_names)
-
         if decode_coords == "all":
             for attr_name in CF_RELATED_DATA:
                 if attr_name in var_attrs:

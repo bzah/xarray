@@ -17,8 +17,7 @@ from xarray.coding.variables import (
     lazy_elemwise_func,
     pop_to,
     safe_setitem,
-    unpack_for_decoding,
-    unpack_for_encoding,
+    unpack,
 )
 from xarray.core import indexing
 from xarray.core.common import contains_cftime_datetimes, is_np_datetime_like
@@ -702,7 +701,7 @@ class CFDatetimeCoder(VariableCoder):
         if np.issubdtype(
             variable.data.dtype, np.datetime64
         ) or contains_cftime_datetimes(variable):
-            dims, data, attrs, encoding = unpack_for_encoding(variable)
+            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
 
             (data, units, calendar) = encode_cf_datetime(
                 data, encoding.pop("units", None), encoding.pop("calendar", None)
@@ -710,14 +709,14 @@ class CFDatetimeCoder(VariableCoder):
             safe_setitem(attrs, "units", units, name=name)
             safe_setitem(attrs, "calendar", calendar, name=name)
 
-            return Variable(dims, data, attrs, encoding, fastpath=True)
+            return Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
         else:
             return variable
 
     def decode(self, variable: Variable, name: T_Name = None) -> Variable:
         units = variable.attrs.get("units", None)
         if isinstance(units, str) and "since" in units:
-            dims, data, attrs, encoding = unpack_for_decoding(variable)
+            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
 
             units = pop_to(attrs, encoding, "units")
             calendar = pop_to(attrs, encoding, "calendar")
@@ -730,7 +729,7 @@ class CFDatetimeCoder(VariableCoder):
             )
             data = lazy_elemwise_func(data, transform, dtype)
 
-            return Variable(dims, data, attrs, encoding, fastpath=True)
+            return Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
         else:
             return variable
 
@@ -738,25 +737,25 @@ class CFDatetimeCoder(VariableCoder):
 class CFTimedeltaCoder(VariableCoder):
     def encode(self, variable: Variable, name: T_Name = None) -> Variable:
         if np.issubdtype(variable.data.dtype, np.timedelta64):
-            dims, data, attrs, encoding = unpack_for_encoding(variable)
+            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
 
             data, units = encode_cf_timedelta(data, encoding.pop("units", None))
             safe_setitem(attrs, "units", units, name=name)
 
-            return Variable(dims, data, attrs, encoding, fastpath=True)
+            return Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
         else:
             return variable
 
     def decode(self, variable: Variable, name: T_Name = None) -> Variable:
         units = variable.attrs.get("units", None)
         if isinstance(units, str) and units in TIME_UNITS:
-            dims, data, attrs, encoding = unpack_for_decoding(variable)
+            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
 
             units = pop_to(attrs, encoding, "units")
             transform = partial(decode_cf_timedelta, units=units)
             dtype = np.dtype("timedelta64[ns]")
             data = lazy_elemwise_func(data, transform, dtype=dtype)
 
-            return Variable(dims, data, attrs, encoding, fastpath=True)
+            return Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
         else:
             return variable

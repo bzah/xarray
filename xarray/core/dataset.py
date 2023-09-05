@@ -649,6 +649,7 @@ class Dataset(
     _close: Callable[[], None] | None
     _indexes: dict[Hashable, Index]
     _variables: dict[Hashable, Variable]
+    _enums: dict[int, str]
 
     __slots__ = (
         "_attrs",
@@ -669,6 +670,7 @@ class Dataset(
         data_vars: Mapping[Any, Any] | None = None,
         coords: Mapping[Any, Any] | None = None,
         attrs: Mapping[Any, Any] | None = None,
+        _enums: dict[int, str] | None = None,
     ) -> None:
         if data_vars is None:
             data_vars = {}
