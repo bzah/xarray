@@ -441,9 +441,14 @@ class NetCDF4DataStore(WritableCFDataStore):
         encoding["source"] = self._filename
         encoding["original_shape"] = var.shape
         encoding["dtype"] = var.dtype
-        return Variable(dimensions, data, attributes, encoding, 
-        enum_meaning= enum_meaning, 
-        enum_name=enum_name)
+        return Variable(
+            dimensions,
+            data,
+            attributes,
+            encoding,
+            enum_meaning=enum_meaning,
+            enum_name=enum_name,
+        )
 
     def get_variables(self):
         return FrozenDict(
@@ -514,9 +519,8 @@ class NetCDF4DataStore(WritableCFDataStore):
         enum = None
         if variable.enum_meaning:
             enum = self.ds.createEnumType(
-                variable.dtype, 
-            variable.enum_name, 
-            variable.enum_meaning)
+                variable.dtype, variable.enum_name, variable.enum_meaning
+            )
 
         if name in self.ds.variables:
             nc4_var = self.ds.variables[name]

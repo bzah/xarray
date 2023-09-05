@@ -68,7 +68,9 @@ class EncodedStringCoder(VariableCoder):
             # TODO: figure out how to handle this in a lazy way with dask
             data = encode_string_array(data, string_encoding)
 
-        return Variable(dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name)
+        return Variable(
+            dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
+        )
 
     def decode(self, variable, name=None):
         dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
@@ -78,7 +80,9 @@ class EncodedStringCoder(VariableCoder):
             func = partial(decode_bytes_array, encoding=string_encoding)
             data = lazy_elemwise_func(data, func, np.dtype(object))
 
-        return Variable(dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name)
+        return Variable(
+            dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
+        )
 
 
 def decode_bytes_array(bytes_array, encoding="utf-8"):
@@ -100,7 +104,9 @@ def ensure_fixed_length_bytes(var):
     if check_vlen_dtype(data.dtype) == bytes:
         # TODO: figure out how to handle this with dask
         data = np.asarray(data, dtype=np.string_)
-    return Variable(dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name)
+    return Variable(
+        dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
+    )
 
 
 class CharacterArrayCoder(VariableCoder):
@@ -117,7 +123,9 @@ class CharacterArrayCoder(VariableCoder):
             else:
                 char_dim_name = f"string{data.shape[-1]}"
             dims = dims + (char_dim_name,)
-        return Variable(dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name)
+        return Variable(
+            dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
+        )
 
     def decode(self, variable, name=None):
         dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
@@ -126,7 +134,9 @@ class CharacterArrayCoder(VariableCoder):
             encoding["char_dim_name"] = dims[-1]
             dims = dims[:-1]
             data = char_to_bytes(data)
-        return Variable(dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name)
+        return Variable(
+            dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
+        )
 
 
 def bytes_to_char(arr):

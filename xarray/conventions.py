@@ -145,7 +145,15 @@ def ensure_dtype_not_object(var: Variable, name: T_Name = None) -> Variable:
             data = _copy_with_dtype(data, dtype=_infer_dtype(data, name))
 
         assert data.dtype.kind != "O" or data.dtype.metadata
-        var = Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
+        var = Variable(
+            dims,
+            data,
+            attrs,
+            encoding,
+            fastpath=True,
+            enum_meaning=enum_meaning,
+            enum_name=enum_name,
+        )
     return var
 
 
@@ -282,14 +290,24 @@ def decode_cf_variable(
 
     var = variables.BooleanCoder().decode(var)
 
-    dimensions, data, attributes, encoding, enum_meaning, enum_name = variables.unpack(var)
+    dimensions, data, attributes, encoding, enum_meaning, enum_name = variables.unpack(
+        var
+    )
 
     encoding.setdefault("dtype", original_dtype)
 
     if not is_duck_dask_array(data):
         data = indexing.LazilyIndexedArray(data)
 
-    return Variable(dimensions, data, attributes, encoding=encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
+    return Variable(
+        dimensions,
+        data,
+        attributes,
+        encoding=encoding,
+        fastpath=True,
+        enum_meaning=enum_meaning,
+        enum_name=enum_name,
+    )
 
 
 def _update_bounds_attributes(variables: T_Variables) -> None:

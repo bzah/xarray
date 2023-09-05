@@ -656,7 +656,7 @@ class DataArray(
     @property
     def enum_meaning(self) -> dict | None:
         return self.variable.enum_meaning
-    
+
     @property
     def name(self) -> Hashable | None:
         """The name of this array."""

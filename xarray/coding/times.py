@@ -709,7 +709,15 @@ class CFDatetimeCoder(VariableCoder):
             safe_setitem(attrs, "units", units, name=name)
             safe_setitem(attrs, "calendar", calendar, name=name)
 
-            return Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
+            return Variable(
+                dims,
+                data,
+                attrs,
+                encoding,
+                fastpath=True,
+                enum_meaning=enum_meaning,
+                enum_name=enum_name,
+            )
         else:
             return variable
 
@@ -729,7 +737,15 @@ class CFDatetimeCoder(VariableCoder):
             )
             data = lazy_elemwise_func(data, transform, dtype)
 
-            return Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
+            return Variable(
+                dims,
+                data,
+                attrs,
+                encoding,
+                fastpath=True,
+                enum_meaning=enum_meaning,
+                enum_name=enum_name,
+            )
         else:
             return variable
 
@@ -742,7 +758,15 @@ class CFTimedeltaCoder(VariableCoder):
             data, units = encode_cf_timedelta(data, encoding.pop("units", None))
             safe_setitem(attrs, "units", units, name=name)
 
-            return Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
+            return Variable(
+                dims,
+                data,
+                attrs,
+                encoding,
+                fastpath=True,
+                enum_meaning=enum_meaning,
+                enum_name=enum_name,
+            )
         else:
             return variable
 
@@ -756,6 +780,14 @@ class CFTimedeltaCoder(VariableCoder):
             dtype = np.dtype("timedelta64[ns]")
             data = lazy_elemwise_func(data, transform, dtype=dtype)
 
-            return Variable(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
+            return Variable(
+                dims,
+                data,
+                attrs,
+                encoding,
+                fastpath=True,
+                enum_meaning=enum_meaning,
+                enum_name=enum_name,
+            )
         else:
             return variable

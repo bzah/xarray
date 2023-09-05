@@ -335,15 +335,16 @@ class Variable(AbstractArray, NdimSizeLenMixin, VariableArithmetic):
 
     __slots__ = ("_dims", "_data", "_attrs", "_encoding", "_enum_name", "_enum_meaning")
 
-    def __init__(self,
-                dims,
-                data,
-                attrs=None,
-                encoding=None,
-                enum_meaning: dict[str, int] | None = None,
-                enum_name: str | None = None,
-                fastpath=False,
-        ):
+    def __init__(
+        self,
+        dims,
+        data,
+        attrs=None,
+        encoding=None,
+        enum_meaning: dict[str, int] | None = None,
+        enum_name: str | None = None,
+        fastpath=False,
+    ):
         """
         Parameters
         ----------
@@ -1131,7 +1132,15 @@ class Variable(AbstractArray, NdimSizeLenMixin, VariableArithmetic):
             enum_meaning = copy.copy(self._enum_meaning)
         if enum_name is _default:
             enum_name = copy.copy(self._enum_name)
-        return type(self)(dims, data, attrs, encoding, fastpath=True, enum_meaning=enum_meaning, enum_name=enum_name)
+        return type(self)(
+            dims,
+            data,
+            attrs,
+            encoding,
+            fastpath=True,
+            enum_meaning=enum_meaning,
+            enum_name=enum_name,
+        )
 
     def __copy__(self: T_Variable) -> T_Variable:
         return self._copy(deep=False)
