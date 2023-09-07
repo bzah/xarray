@@ -49,7 +49,9 @@ if TYPE_CHECKING:
 # string used by netCDF4.
 _endian_lookup = {"=": "native", ">": "big", "<": "little", "|": "native"}
 
-
+# according to https://github.com/DennisHeimbigner/netcdf-c/blob/ef94285ac13b011613bb5e905d49b63d2a3bb076/libsrc4/nc4type.c#L486
+DEFAULT_HDF_ENUM_FILL_VALUE = 255 # should be 0, but I need 255 for my clunky file
+DEFAULT_UNDEFINED_ENUM_MEANING = "_UNDEFINED"
 NETCDF4_PYTHON_LOCK = combine_locks([NETCDFC_LOCK, HDF5_LOCK])
 
 
@@ -410,7 +412,7 @@ class NetCDF4DataStore(WritableCFDataStore):
 
     def open_store_variable(self, name, var):
         import netCDF4
-
+        
         dimensions = var.dimensions
         data = indexing.LazilyIndexedArray(NetCDF4ArrayWrapper(name, self))
         attributes = {k: var.getncattr(k) for k in var.ncattrs()}
@@ -419,6 +421,17 @@ class NetCDF4DataStore(WritableCFDataStore):
         if isinstance(var.datatype, netCDF4.EnumType):
             enum_meaning = var.datatype.enum_dict
             enum_name = var.datatype.name
+            # Add a meaning to fill_value value if missing
+            fill_value = list(var.datatype.enum_dict.values())[0]
+            # fill_value = attributes.get("_FillValue", DEFAULT_HDF_ENUM_FILL_VALUE)
+            attributes["_FillValue"] = fill_value
+            filtered_reverse_enum_meaning = {
+                v: k 
+                for k, v in enum_meaning.items() 
+                if v == fill_value
+                }
+            if filtered_reverse_enum_meaning.get(fill_value) is None:
+                enum_meaning[DEFAULT_UNDEFINED_ENUM_MEANING] = fill_value
         _ensure_fill_value_valid(data, attributes)
         # netCDF4 specific encoding; save _FillValue for later
         encoding = {}
@@ -517,10 +530,13 @@ class NetCDF4DataStore(WritableCFDataStore):
         )
 
         enum = None
-        if variable.enum_meaning:
+        if variable.enum_meaning is not None:
             enum = self.ds.createEnumType(
-                variable.dtype, variable.enum_name, variable.enum_meaning
-            )
+                variable.dtype, 
+            variable.enum_name, 
+            variable.enum_meaning)
+            if fill_value is None:
+                fill_value = list(variable.enum_meaning.values())[0]
 
         if name in self.ds.variables:
             nc4_var = self.ds.variables[name]
