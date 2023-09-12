@@ -10280,3 +10280,9 @@ class Dataset(
             restore_coord_dims=restore_coord_dims,
             **indexer_kwargs,
         )
+    
+        
+    def enumed_varaibles(self) -> Iterator[DataArray]:
+        for v in self.variables:
+            if self[v].enum_meaning is not None:
+                yield self[v]

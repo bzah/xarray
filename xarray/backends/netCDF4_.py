@@ -535,8 +535,13 @@ class NetCDF4DataStore(WritableCFDataStore):
                 variable.dtype, 
             variable.enum_name, 
             variable.enum_meaning)
-            if fill_value is None:
-                fill_value = list(variable.enum_meaning.values())[0]
+            fill_value = None
+            # TODO: we should do the same as with HDF, 
+            #       add a 0 value if it does not exist 
+            #       and set fill_value to 0 (to check if it;s really what they do)
+            # if fill_value is None:
+            #     fill_value = list(variable.enum_meaning.values())[0]
+            
 
         if name in self.ds.variables:
             nc4_var = self.ds.variables[name]
