@@ -649,7 +649,6 @@ class Dataset(
     _close: Callable[[], None] | None
     _indexes: dict[Hashable, Index]
     _variables: dict[Hashable, Variable]
-    _enums: dict[int, str]
 
     __slots__ = (
         "_attrs",
@@ -670,7 +669,6 @@ class Dataset(
         data_vars: Mapping[Any, Any] | None = None,
         coords: Mapping[Any, Any] | None = None,
         attrs: Mapping[Any, Any] | None = None,
-        _enums: dict[int, str] | None = None,
     ) -> None:
         if data_vars is None:
             data_vars = {}
@@ -10280,9 +10278,3 @@ class Dataset(
             restore_coord_dims=restore_coord_dims,
             **indexer_kwargs,
         )
-    
-        
-    def enumed_varaibles(self) -> Iterator[DataArray]:
-        for v in self.variables:
-            if self[v].enum_meaning is not None:
-                yield self[v]

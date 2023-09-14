@@ -10,7 +10,8 @@ from xarray.coding.variables import (
     lazy_elemwise_func,
     pop_to,
     safe_setitem,
-    unpack,
+    unpack_for_decoding,
+    unpack_for_encoding,
 )
 from xarray.core import indexing
 from xarray.core.parallelcompat import get_chunked_array_type, is_chunked_array
@@ -47,7 +48,7 @@ class EncodedStringCoder(VariableCoder):
         self.allows_unicode = allows_unicode
 
     def encode(self, variable, name=None):
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_encoding(variable)
 
         contains_unicode = is_unicode_dtype(data.dtype)
         encode_as_char = encoding.get("dtype") == "S1"
@@ -68,21 +69,17 @@ class EncodedStringCoder(VariableCoder):
             # TODO: figure out how to handle this in a lazy way with dask
             data = encode_string_array(data, string_encoding)
 
-        return Variable(
-            dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
-        )
+        return Variable(dims, data, attrs, encoding)
 
     def decode(self, variable, name=None):
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_decoding(variable)
 
         if "_Encoding" in attrs:
             string_encoding = pop_to(attrs, encoding, "_Encoding")
             func = partial(decode_bytes_array, encoding=string_encoding)
             data = lazy_elemwise_func(data, func, np.dtype(object))
 
-        return Variable(
-            dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
-        )
+        return Variable(dims, data, attrs, encoding)
 
 
 def decode_bytes_array(bytes_array, encoding="utf-8"):
@@ -100,13 +97,11 @@ def encode_string_array(string_array, encoding="utf-8"):
 
 def ensure_fixed_length_bytes(var):
     """Ensure that a variable with vlen bytes is converted to fixed width."""
-    dims, data, attrs, encoding, enum_meaning, enum_name = unpack(var)
+    dims, data, attrs, encoding = unpack_for_encoding(var)
     if check_vlen_dtype(data.dtype) == bytes:
         # TODO: figure out how to handle this with dask
         data = np.asarray(data, dtype=np.string_)
-    return Variable(
-        dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
-    )
+    return Variable(dims, data, attrs, encoding)
 
 
 class CharacterArrayCoder(VariableCoder):
@@ -115,7 +110,7 @@ class CharacterArrayCoder(VariableCoder):
     def encode(self, variable, name=None):
         variable = ensure_fixed_length_bytes(variable)
 
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_encoding(variable)
         if data.dtype.kind == "S" and encoding.get("dtype") is not str:
             data = bytes_to_char(data)
             if "char_dim_name" in encoding.keys():
@@ -123,20 +118,16 @@ class CharacterArrayCoder(VariableCoder):
             else:
                 char_dim_name = f"string{data.shape[-1]}"
             dims = dims + (char_dim_name,)
-        return Variable(
-            dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
-        )
+        return Variable(dims, data, attrs, encoding)
 
     def decode(self, variable, name=None):
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_decoding(variable)
 
         if data.dtype == "S1" and dims:
             encoding["char_dim_name"] = dims[-1]
             dims = dims[:-1]
             data = char_to_bytes(data)
-        return Variable(
-            dims, data, attrs, encoding, enum_meaning=enum_meaning, enum_name=enum_name
-        )
+        return Variable(dims, data, attrs, encoding)
 
 
 def bytes_to_char(arr):

@@ -333,18 +333,9 @@ class Variable(AbstractArray, NdimSizeLenMixin, VariableArithmetic):
     they can use more complete metadata in context of coordinate labels.
     """
 
-    __slots__ = ("_dims", "_data", "_attrs", "_encoding", "_enum_name", "_enum_meaning")
+    __slots__ = ("_dims", "_data", "_attrs", "_encoding")
 
-    def __init__(
-        self,
-        dims,
-        data,
-        attrs=None,
-        encoding=None,
-        enum_meaning: dict[str, int] | None = None,
-        enum_name: str | None = None,
-        fastpath=False,
-    ):
+    def __init__(self, dims, data, attrs=None, encoding=None, fastpath=False):
         """
         Parameters
         ----------
@@ -363,10 +354,6 @@ class Variable(AbstractArray, NdimSizeLenMixin, VariableArithmetic):
             include '_FillValue', 'scale_factor', 'add_offset' and 'dtype'.
             Well-behaved code to serialize a Variable should ignore
             unrecognized encoding items.
-        enum_meaning: dict[str, int] | None, optional
-            todo
-        enum_name: str | None, optional
-            todo
         """
         self._data = as_compatible_data(data, fastpath=fastpath)
         self._dims = self._parse_dimensions(dims)
@@ -376,16 +363,6 @@ class Variable(AbstractArray, NdimSizeLenMixin, VariableArithmetic):
             self.attrs = attrs
         if encoding is not None:
             self.encoding = encoding
-        self._enum_name = enum_name
-        self._enum_meaning = enum_meaning
-
-    @property
-    def enum_meaning(self) -> dict | None:
-        return self._enum_meaning
-
-    @property
-    def enum_name(self) -> dict | None:
-        return self._enum_name
 
     @property
     def dtype(self) -> np.dtype:
@@ -1117,8 +1094,6 @@ class Variable(AbstractArray, NdimSizeLenMixin, VariableArithmetic):
         data=_default,
         attrs=_default,
         encoding=_default,
-        enum_meaning: dict = _default,
-        enum_name: str = _default,
     ) -> T_Variable:
         if dims is _default:
             dims = copy.copy(self._dims)
@@ -1128,19 +1103,7 @@ class Variable(AbstractArray, NdimSizeLenMixin, VariableArithmetic):
             attrs = copy.copy(self._attrs)
         if encoding is _default:
             encoding = copy.copy(self._encoding)
-        if enum_meaning is _default:
-            enum_meaning = copy.copy(self._enum_meaning)
-        if enum_name is _default:
-            enum_name = copy.copy(self._enum_name)
-        return type(self)(
-            dims,
-            data,
-            attrs,
-            encoding,
-            fastpath=True,
-            enum_meaning=enum_meaning,
-            enum_name=enum_name,
-        )
+        return type(self)(dims, data, attrs, encoding, fastpath=True)
 
     def __copy__(self: T_Variable) -> T_Variable:
         return self._copy(deep=False)

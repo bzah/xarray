@@ -167,15 +167,12 @@ def lazy_elemwise_func(array, func: Callable, dtype: np.typing.DTypeLike):
         return _ElementwiseFunctionArray(array, func, dtype)
 
 
-def unpack(var: Variable) -> T_VarTuple:
-    return (
-        var.dims,
-        var.data,
-        var.attrs.copy(),
-        var.encoding.copy(),
-        var.enum_meaning,
-        var.enum_name,
-    )
+def unpack_for_encoding(var: Variable) -> T_VarTuple:
+    return var.dims, var.data, var.attrs.copy(), var.encoding.copy()
+
+
+def unpack_for_decoding(var: Variable) -> T_VarTuple:
+    return var.dims, var._data, var.attrs.copy(), var.encoding.copy()
 
 
 def safe_setitem(dest, key: Hashable, value, name: T_Name = None):
@@ -222,7 +219,7 @@ class CFMaskCoder(VariableCoder):
     """Mask or unmask fill values according to CF conventions."""
 
     def encode(self, variable: Variable, name: T_Name = None):
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_encoding(variable)
 
         dtype = np.dtype(encoding.get("dtype", data.dtype))
         fv = encoding.get("_FillValue")
@@ -253,18 +250,10 @@ class CFMaskCoder(VariableCoder):
             if not pd.isnull(fill_value) and not fv_exists:
                 data = duck_array_ops.fillna(data, fill_value)
 
-        return Variable(
-            dims,
-            data,
-            attrs,
-            encoding,
-            fastpath=True,
-            enum_meaning=enum_meaning,
-            enum_name=enum_name,
-        )
+        return Variable(dims, data, attrs, encoding, fastpath=True)
 
     def decode(self, variable: Variable, name: T_Name = None):
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_decoding(variable)
 
         raw_fill_values = [
             pop_to(attrs, encoding, attr, name=name)
@@ -297,15 +286,7 @@ class CFMaskCoder(VariableCoder):
                 )
                 data = lazy_elemwise_func(data, transform, dtype)
 
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 
@@ -346,7 +327,7 @@ class CFScaleOffsetCoder(VariableCoder):
     """
 
     def encode(self, variable: Variable, name: T_Name = None) -> Variable:
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_encoding(variable)
 
         if "scale_factor" in encoding or "add_offset" in encoding:
             dtype = _choose_float_dtype(data.dtype, "add_offset" in encoding)
@@ -356,20 +337,12 @@ class CFScaleOffsetCoder(VariableCoder):
         if "scale_factor" in encoding:
             data /= pop_to(encoding, attrs, "scale_factor", name=name)
 
-        return Variable(
-            dims,
-            data,
-            attrs,
-            encoding,
-            fastpath=True,
-            enum_meaning=enum_meaning,
-            enum_name=enum_name,
-        )
+        return Variable(dims, data, attrs, encoding, fastpath=True)
 
     def decode(self, variable: Variable, name: T_Name = None) -> Variable:
         _attrs = variable.attrs
         if "scale_factor" in _attrs or "add_offset" in _attrs:
-            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+            dims, data, attrs, encoding = unpack_for_decoding(variable)
 
             scale_factor = pop_to(attrs, encoding, "scale_factor", name=name)
             add_offset = pop_to(attrs, encoding, "add_offset", name=name)
@@ -386,15 +359,7 @@ class CFScaleOffsetCoder(VariableCoder):
             )
             data = lazy_elemwise_func(data, transform, dtype)
 
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 
@@ -406,7 +371,7 @@ class UnsignedIntegerCoder(VariableCoder):
         #     "_Unsigned = "true" to indicate that
         #      integer data should be treated as unsigned"
         if variable.encoding.get("_Unsigned", "false") == "true":
-            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+            dims, data, attrs, encoding = unpack_for_encoding(variable)
 
             pop_to(encoding, attrs, "_Unsigned")
             signed_dtype = np.dtype(f"i{data.dtype.itemsize}")
@@ -415,21 +380,13 @@ class UnsignedIntegerCoder(VariableCoder):
                 attrs["_FillValue"] = new_fill
             data = duck_array_ops.astype(duck_array_ops.around(data), signed_dtype)
 
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 
     def decode(self, variable: Variable, name: T_Name = None) -> Variable:
         if "_Unsigned" in variable.attrs:
-            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+            dims, data, attrs, encoding = unpack_for_decoding(variable)
 
             unsigned = pop_to(attrs, encoding, "_Unsigned")
 
@@ -457,15 +414,7 @@ class UnsignedIntegerCoder(VariableCoder):
                     stacklevel=3,
                 )
 
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 
@@ -474,7 +423,7 @@ class DefaultFillvalueCoder(VariableCoder):
     """Encode default _FillValue if needed."""
 
     def encode(self, variable: Variable, name: T_Name = None) -> Variable:
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_encoding(variable)
         # make NaN the fill value for float types
         if (
             "_FillValue" not in attrs
@@ -482,15 +431,7 @@ class DefaultFillvalueCoder(VariableCoder):
             and np.issubdtype(variable.dtype, np.floating)
         ):
             attrs["_FillValue"] = variable.dtype.type(np.nan)
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 
@@ -507,38 +448,22 @@ class BooleanCoder(VariableCoder):
             and ("dtype" not in variable.encoding)
             and ("dtype" not in variable.attrs)
         ):
-            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+            dims, data, attrs, encoding = unpack_for_encoding(variable)
             attrs["dtype"] = "bool"
             data = duck_array_ops.astype(data, dtype="i1", copy=True)
 
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 
     def decode(self, variable: Variable, name: T_Name = None) -> Variable:
         if variable.attrs.get("dtype", False) == "bool":
-            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+            dims, data, attrs, encoding = unpack_for_decoding(variable)
             # overwrite (!) dtype in encoding, and remove from attrs
             # needed for correct subsequent encoding
             encoding["dtype"] = attrs.pop("dtype")
             data = BoolTypeArray(data)
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 
@@ -550,18 +475,10 @@ class EndianCoder(VariableCoder):
         raise NotImplementedError()
 
     def decode(self, variable: Variable, name: T_Name = None) -> Variable:
-        dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+        dims, data, attrs, encoding = unpack_for_decoding(variable)
         if not data.dtype.isnative:
             data = NativeEndiannessArray(data)
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 
@@ -574,7 +491,7 @@ class NonStringCoder(VariableCoder):
             "S1",
             str,
         ):
-            dims, data, attrs, encoding, enum_meaning, enum_name = unpack(variable)
+            dims, data, attrs, encoding = unpack_for_encoding(variable)
             dtype = np.dtype(encoding.pop("dtype"))
             if dtype != variable.dtype:
                 if np.issubdtype(dtype, np.integer):
@@ -592,15 +509,7 @@ class NonStringCoder(VariableCoder):
                         )
                     data = np.around(data)
                 data = data.astype(dtype=dtype)
-            return Variable(
-                dims,
-                data,
-                attrs,
-                encoding,
-                fastpath=True,
-                enum_meaning=enum_meaning,
-                enum_name=enum_name,
-            )
+            return Variable(dims, data, attrs, encoding, fastpath=True)
         else:
             return variable
 

@@ -49,9 +49,6 @@ if TYPE_CHECKING:
 # string used by netCDF4.
 _endian_lookup = {"=": "native", ">": "big", "<": "little", "|": "native"}
 
-# according to https://github.com/DennisHeimbigner/netcdf-c/blob/ef94285ac13b011613bb5e905d49b63d2a3bb076/libsrc4/nc4type.c#L486
-DEFAULT_HDF_ENUM_FILL_VALUE = 255 # should be 0, but I need 255 for my clunky file
-DEFAULT_UNDEFINED_ENUM_MEANING = "_UNDEFINED"
 NETCDF4_PYTHON_LOCK = combine_locks([NETCDFC_LOCK, HDF5_LOCK])
 
 
@@ -410,28 +407,23 @@ class NetCDF4DataStore(WritableCFDataStore):
     def ds(self):
         return self._acquire()
 
-    def open_store_variable(self, name, var):
+    def open_store_variable(self, name: str, var):
         import netCDF4
-        
+
         dimensions = var.dimensions
-        data = indexing.LazilyIndexedArray(NetCDF4ArrayWrapper(name, self))
         attributes = {k: var.getncattr(k) for k in var.ncattrs()}
+
         enum_meaning = None
         enum_name = None
         if isinstance(var.datatype, netCDF4.EnumType):
             enum_meaning = var.datatype.enum_dict
             enum_name = var.datatype.name
-            # Add a meaning to fill_value value if missing
-            fill_value = list(var.datatype.enum_dict.values())[0]
-            # fill_value = attributes.get("_FillValue", DEFAULT_HDF_ENUM_FILL_VALUE)
-            attributes["_FillValue"] = fill_value
-            filtered_reverse_enum_meaning = {
-                v: k 
-                for k, v in enum_meaning.items() 
-                if v == fill_value
-                }
-            if filtered_reverse_enum_meaning.get(fill_value) is None:
-                enum_meaning[DEFAULT_UNDEFINED_ENUM_MEANING] = fill_value
+            attributes["enum_name"] = enum_name
+            attributes["enum_meaning"] = enum_meaning
+        data = indexing.LazilyIndexedArray(NetCDF4ArrayWrapper(name, self))
+        # if enum_meaning is not None:
+        #     data.array.replace_mask(mask=mask, replacing_value=fill_value)
+
         _ensure_fill_value_valid(data, attributes)
         # netCDF4 specific encoding; save _FillValue for later
         encoding = {}
@@ -454,14 +446,8 @@ class NetCDF4DataStore(WritableCFDataStore):
         encoding["source"] = self._filename
         encoding["original_shape"] = var.shape
         encoding["dtype"] = var.dtype
-        return Variable(
-            dimensions,
-            data,
-            attributes,
-            encoding,
-            enum_meaning=enum_meaning,
-            enum_name=enum_name,
-        )
+
+        return Variable(dimensions, data, attributes, encoding)
 
     def get_variables(self):
         return FrozenDict(
@@ -489,7 +475,7 @@ class NetCDF4DataStore(WritableCFDataStore):
     def set_attribute(self, key, value):
         if self.format != "NETCDF4":
             value = encode_nc3_attr_value(value)
-        if _is_list_of_strings(value):
+        if _is_list_of_strings(value) or isinstance(value , str):
             # encode as NC_STRING if attr is list of strings
             self.ds.setncattr_string(key, value)
         else:
@@ -530,25 +516,22 @@ class NetCDF4DataStore(WritableCFDataStore):
         )
 
         enum = None
-        if variable.enum_meaning is not None:
+        if attrs.get("enum_meaning") is not None:
             enum = self.ds.createEnumType(
-                variable.dtype, 
-            variable.enum_name, 
-            variable.enum_meaning)
+                variable.dtype,
+                attrs["enum_name"],
+                attrs["enum_meaning"],
+            )
+            datatype = enum
+            del attrs["enum_name"]
+            del attrs["enum_meaning"]
             fill_value = None
-            # TODO: we should do the same as with HDF, 
-            #       add a 0 value if it does not exist 
-            #       and set fill_value to 0 (to check if it;s really what they do)
-            # if fill_value is None:
-            #     fill_value = list(variable.enum_meaning.values())[0]
-            
-
         if name in self.ds.variables:
             nc4_var = self.ds.variables[name]
         else:
             nc4_var = self.ds.createVariable(
                 varname=name,
-                datatype=enum if enum else datatype,
+                datatype=datatype,
                 dimensions=variable.dims,
                 zlib=encoding.get("zlib", False),
                 complevel=encoding.get("complevel", 4),
@@ -561,7 +544,13 @@ class NetCDF4DataStore(WritableCFDataStore):
                 fill_value=fill_value,
             )
 
-        nc4_var.setncatts(attrs)
+        for k,v in attrs.items():
+            if isinstance(v, str):
+                nc4_var.setncattr_string(k, v)
+            else:
+                nc4_var.setncattr(k, v)
+        
+        # nc4_var.setncatts(attrs)
 
         target = NetCDF4ArrayWrapper(name, self)
 
