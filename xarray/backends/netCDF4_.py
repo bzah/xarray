@@ -475,7 +475,7 @@ class NetCDF4DataStore(WritableCFDataStore):
     def set_attribute(self, key, value):
         if self.format != "NETCDF4":
             value = encode_nc3_attr_value(value)
-        if _is_list_of_strings(value) or isinstance(value , str):
+        if _is_list_of_strings(value) or isinstance(value, str):
             # encode as NC_STRING if attr is list of strings
             self.ds.setncattr_string(key, value)
         else:
@@ -515,14 +515,15 @@ class NetCDF4DataStore(WritableCFDataStore):
             variable, raise_on_invalid=check_encoding, unlimited_dims=unlimited_dims
         )
 
-        enum = None
         if attrs.get("enum_meaning") is not None:
-            enum = self.ds.createEnumType(
-                variable.dtype,
-                attrs["enum_name"],
-                attrs["enum_meaning"],
-            )
-            datatype = enum
+            if attrs["enum_name"] in self.ds.enumtypes:
+                datatype = self.ds.enumtypes[attrs["enum_name"]]
+            else:
+                datatype = self.ds.createEnumType(
+                    variable.dtype,
+                    attrs["enum_name"],
+                    attrs["enum_meaning"],
+                )
             del attrs["enum_name"]
             del attrs["enum_meaning"]
             fill_value = None
@@ -544,12 +545,12 @@ class NetCDF4DataStore(WritableCFDataStore):
                 fill_value=fill_value,
             )
 
-        for k,v in attrs.items():
+        for k, v in attrs.items():
             if isinstance(v, str):
                 nc4_var.setncattr_string(k, v)
             else:
                 nc4_var.setncattr(k, v)
-        
+
         # nc4_var.setncatts(attrs)
 
         target = NetCDF4ArrayWrapper(name, self)
